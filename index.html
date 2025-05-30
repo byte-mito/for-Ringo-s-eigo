@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>15-Minute English Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body { font-family: sans-serif; max-width: 700px; margin: auto; padding: 20px; }
     .question { margin: 20px 0; }
     .options label { display: block; margin-left: 20px; }
-    #result { background: #eee; padding: 10px; margin-top: 20px; white-space: pre-wrap; }
+    #result, #history { background: #f0f0f0; padding: 10px; margin-top: 20px; white-space: pre-wrap; border: 1px solid #ccc; }
+    button { margin-top: 10px; margin-right: 10px; }
   </style>
 </head>
 <body>
@@ -22,25 +24,7 @@
       </div>
     </div>
 
-    <!-- Repeat similar blocks for q2 to q10 -->
-    <!-- Here's a short example for a few more: -->
-    <div class="question"><b>2. They _____ playing football now.</b>
-      <div class="options">
-        <label><input type="radio" name="q2" value="A"> is</label>
-        <label><input type="radio" name="q2" value="B"> are</label>
-        <label><input type="radio" name="q2" value="C"> was</label>
-        <label><input type="radio" name="q2" value="D"> be</label>
-      </div>
-    </div>
-
-    <div class="question"><b>10. They ______ working hard.</b>
-      <div class="options">
-        <label><input type="radio" name="q10" value="A"> is</label>
-        <label><input type="radio" name="q10" value="B"> are</label>
-        <label><input type="radio" name="q10" value="C"> was</label>
-        <label><input type="radio" name="q10" value="D"> be</label>
-      </div>
-    </div>
+    <!-- Thêm các câu hỏi khác nếu muốn -->
 
     <div class="question">
       <b>11. Reading passage:</b>
@@ -59,18 +43,85 @@
 
   <div id="result" style="display:none"></div>
 
+  <h3>Submission History</h3>
+  <div id="history">No submissions yet.</div>
+
+  <button onclick="downloadHistory()">📄 Download PDF</button>
+  <button onclick="clearHistory()">🗑️ Clear History</button>
+
   <script>
     function submitTest() {
       const form = document.getElementById('test');
       const data = new FormData(form);
-      let out = 'Submitted Answers:\\n\\n';
+      let result = {};
+      let text = "";
+
       for (let i = 1; i <= 11; i++) {
-        let ans = data.get('q' + i);
-        out += `Q${i}: ${ans || '[No answer]'}\\n`;
+        let ans = data.get("q" + i) || "[No answer]";
+        result["Q" + i] = ans;
+        text += `Q${i}: ${ans}\n`;
       }
-      document.getElementById('result').textContent = out;
-      document.getElementById('result').style.display = 'block';
+
+      document.getElementById("result").textContent = "Submitted! Your answers:\n\n" + text;
+      document.getElementById("result").style.display = "block";
+
+      let history = JSON.parse(localStorage.getItem("testHistory") || "[]");
+      history.unshift({ time: new Date().toLocaleString(), answers: result });
+      localStorage.setItem("testHistory", JSON.stringify(history));
+      renderHistory();
     }
+
+    function renderHistory() {
+      const container = document.getElementById("history");
+      let history = JSON.parse(localStorage.getItem("testHistory") || "[]");
+      if (!history.length) {
+        container.textContent = "No submissions yet.";
+        return;
+      }
+
+      container.innerHTML = history.map((entry, idx) => {
+        let lines = Object.entries(entry.answers).map(([q, a]) => `${q}: ${a}`).join("<br>");
+        return `<div><b>Submission ${idx + 1} (${entry.time})</b><br>${lines}</div><hr>`;
+      }).join("");
+    }
+
+    function clearHistory() {
+      if (confirm("Are you sure you want to delete all submission history?")) {
+        localStorage.removeItem("testHistory");
+        renderHistory();
+        alert("History cleared.");
+      }
+    }
+
+    async function downloadHistory() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let history = JSON.parse(localStorage.getItem("testHistory") || "[]");
+      if (!history.length) {
+        alert("No history to download.");
+        return;
+      }
+
+      let y = 10;
+      history.forEach((entry, idx) => {
+        doc.setFontSize(12);
+        doc.text(`Submission ${idx + 1} - ${entry.time}`, 10, y);
+        y += 6;
+        Object.entries(entry.answers).forEach(([q, a]) => {
+          doc.text(`${q}: ${a}`, 15, y);
+          y += 6;
+          if (y > 270) {
+            doc.addPage();
+            y = 10;
+          }
+        });
+        y += 6;
+      });
+
+      doc.save("english-test-history.pdf");
+    }
+
+    renderHistory();
   </script>
 </body>
 </html>
